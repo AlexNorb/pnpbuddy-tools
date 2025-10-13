@@ -1,10 +1,10 @@
-# Workflow to deploy the 'Layout-2.0' branch to a specific subdirectory.
-name: Deploy Layout 2.0 Staging Content
+# Workflow to deploy the 'Layout-2.0' branch to a specific subdirectory: /testing
+name: Deploy Layout 2.0 Testing Environment
 
 on:
   # Runs on pushes targeting the 'Layout-2.0' branch
   push:
-    branches: ["Layout-2.0"]
+    branches: ["Layout-2.0"] # NOTE: Ensure this matches the branch name EXACTLY (case-sensitive)
 
   # Allows you to run this workflow manually
   workflow_dispatch:
@@ -15,11 +15,10 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, canceling runs queued between the run in-progress and latest queued.
+# Allows only one concurrent deployment for this environment, canceling older runs.
 concurrency:
-  # Use a group name specific to this branch/environment
   group: "layout_pages"
-  cancel-in-progress: true # Correctly set to true to cancel older builds
+  cancel-in-progress: true 
 
 jobs:
   build:
@@ -28,22 +27,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
+      # 1. Stage files in the 'testing' folder to ensure correct subdirectory deployment
+      - name: Stage Content in Testing Directory
+        run: |
+          # Create a temporary directory named 'testing'
+          mkdir testing
+          # Move all site files (excluding hidden files and the testing dir itself) into the new directory
+          # The exact command may vary, but this is robust for static content:
+          shopt -s extglob
+          mv !(testing) testing/
+          shopt -u extglob
+          # Optional: Add a .nojekyll file to skip Jekyll processing
+          touch testing/.nojekyll
+
       - name: Setup Pages
+        # This configures the environment for GitHub Pages deployment
         uses: actions/configure-pages@v5
-        with:
-          # Set the base path to '/testing'
-          static_site_artifact_path: 'testing' 
-          
+        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload entire repository (assuming static files are in root)
-          path: '.'
+          # Upload ONLY the 'testing' folder. 
+          # This tells GitHub Pages that the site's content lives under /testing/
+          path: 'testing'
 
   # Deployment job runs after build succeeds
   deploy:
     environment:
-      # Use a new environment name for tracking
+      # Environment name visible in the GitHub UI
       name: layout-2-0
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
@@ -52,4 +63,3 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-        
